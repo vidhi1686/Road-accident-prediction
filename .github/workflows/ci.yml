@@ -1,3 +1,4 @@
+
 name: CI
 
 on:
@@ -23,6 +24,12 @@ jobs:
 
       - name: Generate dataset
         run: python data/generate_data.py
+
+      # NEW STEP: Start with a fresh MLflow database
+      - name: Reset MLflow tracking for CI
+        run: |
+          rm -f mlflow.db
+          rm -rf mlartifacts
 
       - name: Train baseline model
         run: python train.py --algorithm gb --n_estimators 100 --max_depth 3 --learning_rate 0.1
