@@ -1,0 +1,30 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.13.1, pytest-9.2.0, pluggy-1.7.0 -- /Users/vidhijindal/Desktop/Road-accident-prediction/venv/bin/python3.13
+cachedir: .pytest_cache
+rootdir: /Users/vidhijindal/Desktop/Road-accident-prediction
+configfile: pytest.ini
+testpaths: tests
+plugins: anyio-4.16.0
+collecting ... collected 13 items
+
+tests/test_app.py::test_health_check PASSED                              [  7%]
+tests/test_app.py::test_ui_loads PASSED                                  [ 15%]
+tests/test_app.py::test_prediction_contract PASSED                       [ 23%]
+tests/test_app.py::test_high_risk_case_scores_above_low_risk_case PASSED [ 30%]
+tests/test_app.py::test_out_of_contract_input_returns_422[speed_limit-999] PASSED [ 38%]
+tests/test_app.py::test_out_of_contract_input_returns_422[driver_age-15] PASSED [ 46%]
+tests/test_app.py::test_out_of_contract_input_returns_422[num_vehicles-0] PASSED [ 53%]
+tests/test_app.py::test_out_of_contract_input_returns_422[hour-24] PASSED [ 61%]
+tests/test_app.py::test_out_of_contract_input_returns_422[weather-storm] PASSED [ 69%]
+tests/test_app.py::test_out_of_contract_input_returns_422[road_type-motorway] PASSED [ 76%]
+tests/test_app.py::test_out_of_contract_input_returns_422[is_weekend-2] PASSED [ 84%]
+tests/test_app.py::test_boundary_values_are_accepted PASSED              [ 92%]
+tests/test_app.py::test_missing_field_returns_422 PASSED                 [100%]
+
+=============================== warnings summary ===============================
+venv/lib/python3.13/site-packages/fastapi/testclient.py:1
+  /Users/vidhijindal/Desktop/Road-accident-prediction/venv/lib/python3.13/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================== 13 passed, 1 warning in 2.56s =========================

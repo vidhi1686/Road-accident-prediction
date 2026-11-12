@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Road Accident Severity Predictor</title>
+  <style>
+    :root {
+      --bg: #0b1220;
+      --card: #121b2e;
+      --card-2: #17223a;
+      --text: #e8eefc;
+      --muted: #93a3c4;
+      --accent: #4f8cff;
+      --accent-2: #22d3a6;
+      --danger: #ff5d73;
+      --warn: #ffb020;
+      --line: #24314d;
+      --radius: 14px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background:
+        radial-gradient(900px 500px at 15% -10%, #1b2b4d 0%, transparent 60%),
+        radial-gradient(700px 400px at 100% 0%, #143a35 0%, transparent 55%),
+        var(--bg);
+      color: var(--text);
+      font-family: ui-sans-serif, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      padding: 32px 20px 48px;
+    }
+    .wrap { max-width: 1050px; margin: 0 auto; }
+    header { margin-bottom: 24px; }
+    .eyebrow {
+      display: inline-flex; gap: 8px; align-items: center;
+      font-size: 12px; letter-spacing: .12em; text-transform: uppercase;
+      color: var(--accent-2); font-weight: 700;
+    }
+    h1 { font-size: clamp(24px, 3.4vw, 34px); margin: 8px 0 6px; letter-spacing: -.02em; }
+    .sub { color: var(--muted); margin: 0; max-width: 70ch; line-height: 1.5; }
+    .grid { display: grid; grid-template-columns: 1.1fr .9fr; gap: 18px; align-items: start; }
+    @media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
+    .card {
+      background: linear-gradient(180deg, var(--card-2), var(--card));
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 20px;
+      box-shadow: 0 18px 50px rgba(0,0,0,.28);
+    }
+    .card h2 { font-size: 15px; margin: 0 0 14px; letter-spacing: .02em; }
+    .fields { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    @media (max-width: 520px) { .fields { grid-template-columns: 1fr; } }
+    label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 5px; font-weight: 600; }
+    input, select {
+      width: 100%; padding: 10px 12px;
+      background: #0d1526; color: var(--text);
+      border: 1px solid var(--line); border-radius: 9px;
+      font: inherit; font-size: 14px; outline: none;
+    }
+    input:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(79,140,255,.18); }
+    .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .actions { display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap; }
+    button {
+      font: inherit; font-weight: 700; cursor: pointer;
+      border-radius: 10px; border: 1px solid transparent; padding: 11px 18px;
+      transition: transform .06s ease, filter .15s ease;
+    }
+    button:active { transform: translateY(1px); }
+    button.primary { background: linear-gradient(180deg, #6aa1ff, var(--accent)); color: #06122a; }
+    button.ghost { background: transparent; color: var(--muted); border-color: var(--line); }
+    button.ghost:hover { color: var(--text); border-color: #3a4a6d; }
+    .result { min-height: 280px; display: flex; flex-direction: column; gap: 14px; }
+    .verdict {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      padding: 16px; border-radius: 12px; border: 1px solid var(--line); background: #0d1526;
+    }
+    .verdict .label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .1em; }
+    .verdict .value { font-size: 22px; font-weight: 800; margin-top: 3px; }
+    .pill { font-size: 12px; font-weight: 700; padding: 6px 10px; border-radius: 999px; white-space: nowrap; }
+    .pill.severe { background: rgba(255,93,115,.14); color: var(--danger); border: 1px solid rgba(255,93,115,.35); }
+    .pill.safe { background: rgba(34,211,166,.12); color: var(--accent-2); border: 1px solid rgba(34,211,166,.3); }
+    .meter { height: 10px; border-radius: 999px; background: #0a1120; overflow: hidden; border: 1px solid var(--line); }
+    .meter > span { display: block; height: 100%; width: 0%; background: linear-gradient(90deg, var(--accent-2), var(--warn), var(--danger)); transition: width .45s ease; }
+    .prob { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); margin-top: 7px; }
+    .tips { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+    .tips li {
+      display: flex; gap: 9px; align-items: flex-start;
+      font-size: 13.5px; line-height: 1.45; color: #cdd9f2;
+      background: #0d1526; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px;
+    }
+    .tips li::before { content: "•"; color: var(--accent); font-weight: 900; }
+    .placeholder { color: var(--muted); font-size: 13.5px; line-height: 1.6; }
+    .error { color: var(--danger); font-size: 13px; white-space: pre-wrap; }
+    .imps { display: grid; gap: 8px; margin-top: 16px; }
+    .imp { display: grid; grid-template-columns: 150px 1fr 46px; gap: 10px; align-items: center; font-size: 12px; }
+    .imp .name { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .imp .bar { height: 7px; background: #0a1120; border-radius: 999px; overflow: hidden; border: 1px solid var(--line); }
+    .imp .bar > span { display: block; height: 100%; background: var(--accent); }
+    .imp .val { text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+    footer { margin-top: 22px; color: var(--muted); font-size: 12px; display: flex; gap: 14px; flex-wrap: wrap; }
+    footer code { color: #cdd9f2; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <span class="eyebrow">CSL236 · Road Safety ML</span>
+      <h1>Road Accident Severity Predictor</h1>
+      <p class="sub">Enter the conditions of a collision. The model estimates whether it is likely to be
+        <strong>severe</strong> and returns tailored safety guidance.</p>
+    </header>
+
+    <div class="grid">
+      <section class="card" aria-labelledby="form-title">
+        <h2 id="form-title">Accident conditions</h2>
+        <form id="predict-form">
+          <div class="fields">
+            <div>
+              <label for="speed_limit">Speed limit (mph)</label>
+              <input id="speed_limit" name="speed_limit" type="number" min="20" max="120" value="60" required />
+            </div>
+            <div>
+              <label for="driver_age">Driver age (years)</label>
+              <input id="driver_age" name="driver_age" type="number" min="16" max="90" value="27" required />
+            </div>
+            <div>
+              <label for="num_vehicles">Vehicles involved</label>
+              <input id="num_vehicles" name="num_vehicles" type="number" min="1" max="10" value="2" required />
+            </div>
+            <div>
+              <label for="num_casualties">Casualties</label>
+              <input id="num_casualties" name="num_casualties" type="number" min="0" max="10" value="1" required />
+            </div>
+            <div>
+              <label for="weather">Weather</label>
+              <select id="weather" name="weather">
+                <option value="clear">Clear</option>
+                <option value="rain" selected>Rain</option>
+                <option value="fog">Fog</option>
+                <option value="snow">Snow</option>
+              </select>
+            </div>
+            <div>
+              <label for="road_type">Road type</label>
+              <select id="road_type" name="road_type">
+                <option value="urban">Urban</option>
+                <option value="rural">Rural</option>
+                <option value="highway" selected>Highway</option>
+                <option value="intersection">Intersection</option>
+              </select>
+            </div>
+            <div>
+              <label for="light_condition">Light condition</label>
+              <select id="light_condition" name="light_condition">
+                <option value="daylight">Daylight</option>
+                <option value="dark" selected>Dark</option>
+                <option value="dusk">Dusk</option>
+              </select>
+            </div>
+            <div>
+              <label for="hour">Hour of day (0–23)</label>
+              <input id="hour" name="hour" type="number" min="0" max="23" value="22" required />
+            </div>
+            <div>
+              <label for="is_weekend">Weekend?</label>
+              <select id="is_weekend" name="is_weekend">
+                <option value="0">No</option>
+                <option value="1" selected>Yes</option>
+              </select>
+            </div>
+          </div>
+          <div class="actions">
+            <button class="primary" type="submit">Predict severity</button>
+            <button class="ghost" type="button" id="low-risk">Load low-risk example</button>
+            <button class="ghost" type="button" id="high-risk">Load high-risk example</button>
+          </div>
+        </form>
+
+        <div class="imps" id="importances" aria-label="Feature importance"></div>
+      </section>
+
+      <section class="card result" aria-live="polite" aria-labelledby="result-title">
+        <h2 id="result-title">Prediction</h2>
+        <p class="placeholder" id="placeholder">Submit the form to see the predicted severity, the model's
+          probability and 2–3 safety tips for the conditions.</p>
+
+        <div id="output" hidden>
+          <div class="verdict">
+            <div>
+              <div class="label">Expected severity</div>
+              <div class="value" id="verdict-label">—</div>
+            </div>
+            <span class="pill" id="verdict-pill">—</span>
+          </div>
+
+          <div style="margin-top:14px">
+            <div class="meter"><span id="meter-fill"></span></div>
+            <div class="prob"><span>Severity probability</span><span id="prob-value">0%</span></div>
+          </div>
+
+          <h2 style="margin-top:18px">Safety tips</h2>
+          <ul class="tips" id="tips"></ul>
+        </div>
+
+        <p class="error" id="error" hidden></p>
+      </section>
+    </div>
+
+    <footer id="footer">
+      <span>Model: <code id="model-algo">—</code></span>
+      <span>Test F1: <code id="model-f1">—</code></span>
+      <span>ROC-AUC: <code id="model-auc">—</code></span>
+      <span>Docs: <a href="/docs" style="color:#4f8cff">/docs</a></span>
+    </footer>
+  </div>
+
+  <script>
+    const form = document.getElementById("predict-form");
+    const output = document.getElementById("output");
+    const placeholder = document.getElementById("placeholder");
+    const errorBox = document.getElementById("error");
+
+    const lowRisk = {
+      speed_limit: 25, num_vehicles: 1, num_casualties: 0, driver_age: 45,
+      weather: "clear", road_type: "urban", light_condition: "daylight",
+      hour: 10, is_weekend: "0"
+    };
+    const highRisk = {
+      speed_limit: 70, num_vehicles: 4, num_casualties: 3, driver_age: 19,
+      weather: "snow", road_type: "highway", light_condition: "dark",
+      hour: 2, is_weekend: "1"
+    };
+
+    function fill(values) {
+      for (const [key, value] of Object.entries(values)) {
+        const field = document.getElementById(key);
+        if (field) field.value = value;
+      }
+    }
+
+    document.getElementById("low-risk").addEventListener("click", () => fill(lowRisk));
+    document.getElementById("high-risk").addEventListener("click", () => fill(highRisk));
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      errorBox.hidden = true;
+
+      const data = Object.fromEntries(new FormData(form).entries());
+      const payload = {
+        speed_limit: Number(data.speed_limit),
+        num_vehicles: Number(data.num_vehicles),
+        num_casualties: Number(data.num_casualties),
+        driver_age: Number(data.driver_age),
+        weather: data.weather,
+        road_type: data.road_type,
+        light_condition: data.light_condition,
+        hour: Number(data.hour),
+        is_weekend: Number(data.is_weekend),
+      };
+
+      try {
+        const response = await fetch("/predict", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+          const detail = await response.json();
+          throw new Error(formatError(detail));
+        }
+
+        render(await response.json());
+      } catch (error) {
+        output.hidden = true;
+        placeholder.hidden = false;
+        placeholder.textContent = "Could not score this input.";
+        errorBox.hidden = false;
+        errorBox.textContent = error.message;
+      }
+    });
+
+    function formatError(detail) {
+      if (!detail || !detail.detail) return "Request failed.";
+      if (typeof detail.detail === "string") return detail.detail;
+      return detail.detail.map((item) => `${item.loc.join(".")}: ${item.msg}`).join("\n");
+    }
+
+    function render(result) {
+      placeholder.hidden = true;
+      output.hidden = false;
+      errorBox.hidden = true;
+
+      const severe = result.prediction === 1;
+      document.getElementById("verdict-label").textContent = result.label;
+      const pill = document.getElementById("verdict-pill");
+      pill.textContent = severe ? "HIGH RISK" : "LOWER RISK";
+      pill.className = "pill " + (severe ? "severe" : "safe");
+
+      const percent = Math.round(result.severity_probability * 100);
+      document.getElementById("meter-fill").style.width = percent + "%";
+      document.getElementById("prob-value").textContent = percent + "%";
+
+      const tips = document.getElementById("tips");
+      tips.innerHTML = "";
+      for (const tip of result.tips) {
+        const item = document.createElement("li");
+        item.textContent = tip;
+        tips.appendChild(item);
+      }
+    }
+
+    async function loadModelInfo() {
+      try {
+        const info = await fetch("/model-info").then((r) => r.json());
+        if (!info || !info.metrics) return;
+        document.getElementById("model-algo").textContent = info.algorithm || "—";
+        document.getElementById("model-f1").textContent = Number(info.metrics.f1).toFixed(3);
+        document.getElementById("model-auc").textContent = Number(info.metrics.roc_auc).toFixed(3);
+
+        const container = document.getElementById("importances");
+        const features = (info.top_features || []).slice(0, 5);
+        if (!features.length) return;
+        const max = Math.max(...features.map((f) => f.importance)) || 1;
+        container.innerHTML = "";
+        for (const feature of features) {
+          const row = document.createElement("div");
+          row.className = "imp";
+          const name = document.createElement("span");
+          name.className = "name";
+          name.textContent = feature.feature.replaceAll("_", " ");
+          name.title = feature.feature;
+          const bar = document.createElement("span");
+          bar.className = "bar";
+          const fill = document.createElement("span");
+          fill.style.width = (100 * feature.importance / max).toFixed(1) + "%";
+          bar.appendChild(fill);
+          const value = document.createElement("span");
+          value.className = "val";
+          value.textContent = Number(feature.importance).toFixed(3);
+          row.append(name, bar, value);
+          container.appendChild(row);
+        }
+        const caption = document.createElement("div");
+        caption.style.cssText = "font-size:11px;color:#93a3c4;margin-top:2px";
+        caption.textContent = "Top model signals (feature importance)";
+        container.appendChild(caption);
+      } catch {
+        /* UI still works without model-info */
+      }
+    }
+
+    loadModelInfo();
+  </script>
+</body>
+</html>

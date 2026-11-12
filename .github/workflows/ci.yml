@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    name: Train and test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Generate dataset
+        run: python data/generate_data.py
+
+      - name: Train baseline model
+        run: python train.py --algorithm gb --n_estimators 100 --max_depth 3 --learning_rate 0.1
+
+      - name: Run tests
+        run: pytest -v --tb=short
+
+  docker:
+    name: Build serving image
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image
+        run: docker build -t road-accident-prediction .

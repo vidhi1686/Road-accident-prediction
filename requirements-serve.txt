@@ -1,0 +1,8 @@
+# Lean serving runtime: no MLflow, no pytest
+pandas==3.1.1
+numpy==2.4.6
+scikit-learn==1.9.1
+joblib==1.6.0
+fastapi==0.162.5
+uvicorn==0.54.0
+pydantic==2.14.3
