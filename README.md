@@ -247,7 +247,7 @@ pytest -v --tb=short
 
 ## 9. CI/CD and deployment
 
-### GitHub Actions
+## Continuous Integration
 
 `.github/workflows/ci.yml` runs on every push to `main` and on pull requests:
 
@@ -258,7 +258,7 @@ pytest -v --tb=short
 4. Run `pytest -v --tb=short`.
 5. Build the serving Docker image.
 
-**Latest CI status:** _add the green-check screenshot here after pushing._
+![CI Success](screenshots/ci-success.png)
 
 ### Deployment (Render / Railway / EC2)
 
@@ -280,7 +280,7 @@ EC2:
 docker run -d -p 80:8000 --restart unless-stopped road-accident-prediction
 ```
 
-**Live URL:** _paste the public URL here after deployment._
+**Live URL:** https://road-accident-prediction-day1.onrender.com
 
 ### Monitoring / drift
 
