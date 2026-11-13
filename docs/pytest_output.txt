@@ -1,25 +1,39 @@
 ============================= test session starts ==============================
-platform darwin -- Python 3.13.1, pytest-9.2.0, pluggy-1.7.0 -- /Users/vidhijindal/Desktop/Road-accident-prediction/venv/bin/python3.13
+platform darwin -- Python 3.13.1, pytest-9.2.0, pluggy-1.7.0 -- /Users/vidhijindal/Desktop/Road-accident-prediction/venv/bin/python
 cachedir: .pytest_cache
 rootdir: /Users/vidhijindal/Desktop/Road-accident-prediction
 configfile: pytest.ini
 testpaths: tests
 plugins: anyio-4.16.0
-collecting ... collected 13 items
+collecting ... collected 27 items
 
-tests/test_app.py::test_health_check PASSED                              [  7%]
-tests/test_app.py::test_ui_loads PASSED                                  [ 15%]
-tests/test_app.py::test_prediction_contract PASSED                       [ 23%]
-tests/test_app.py::test_high_risk_case_scores_above_low_risk_case PASSED [ 30%]
-tests/test_app.py::test_out_of_contract_input_returns_422[speed_limit-999] PASSED [ 38%]
-tests/test_app.py::test_out_of_contract_input_returns_422[driver_age-15] PASSED [ 46%]
-tests/test_app.py::test_out_of_contract_input_returns_422[num_vehicles-0] PASSED [ 53%]
-tests/test_app.py::test_out_of_contract_input_returns_422[hour-24] PASSED [ 61%]
-tests/test_app.py::test_out_of_contract_input_returns_422[weather-storm] PASSED [ 69%]
-tests/test_app.py::test_out_of_contract_input_returns_422[road_type-motorway] PASSED [ 76%]
-tests/test_app.py::test_out_of_contract_input_returns_422[is_weekend-2] PASSED [ 84%]
-tests/test_app.py::test_boundary_values_are_accepted PASSED              [ 92%]
-tests/test_app.py::test_missing_field_returns_422 PASSED                 [100%]
+tests/test_app.py::test_health_check PASSED                              [  3%]
+tests/test_app.py::test_ui_loads PASSED                                  [  7%]
+tests/test_app.py::test_ui_contains_all_feature_fields PASSED            [ 11%]
+tests/test_app.py::test_categories_endpoint PASSED                       [ 14%]
+tests/test_app.py::test_prediction_contract PASSED                       [ 18%]
+tests/test_app.py::test_model_info_endpoint PASSED                       [ 22%]
+tests/test_app.py::test_prediction_logging PASSED                        [ 25%]
+tests/test_app.py::test_missing_field_returns_422 PASSED                 [ 29%]
+tests/test_app.py::test_extra_field_returns_422 PASSED                   [ 33%]
+tests/test_app.py::test_invalid_category_returns_422 PASSED              [ 37%]
+tests/test_app.py::test_invalid_numeric_values_return_422[hour-24] PASSED [ 40%]
+tests/test_app.py::test_invalid_numeric_values_return_422[hour--1] PASSED [ 44%]
+tests/test_app.py::test_invalid_numeric_values_return_422[is_weekend-2] PASSED [ 48%]
+tests/test_app.py::test_invalid_numeric_values_return_422[num_vehicles-0] PASSED [ 51%]
+tests/test_app.py::test_invalid_numeric_values_return_422[num_casualties--1] PASSED [ 55%]
+tests/test_app.py::test_boundary_values_are_accepted PASSED              [ 59%]
+tests/test_app.py::test_unknown_ordinal_category_returns_422 PASSED      [ 62%]
+tests/test_preprocess.py::test_output_shape_and_row_preservation PASSED  [ 66%]
+tests/test_preprocess.py::test_output_columns PASSED                     [ 70%]
+tests/test_preprocess.py::test_target_mapping PASSED                     [ 74%]
+tests/test_preprocess.py::test_severe_prevalence PASSED                  [ 77%]
+tests/test_preprocess.py::test_leakage_columns_absent PASSED             [ 81%]
+tests/test_preprocess.py::test_schema_lists_match_preprocessing PASSED   [ 85%]
+tests/test_preprocess.py::test_category_values_match_cleaned_data PASSED [ 88%]
+tests/test_preprocess.py::test_missing_value_handling PASSED             [ 92%]
+tests/test_preprocess.py::test_whitespace_and_unknown_normalisation PASSED [ 96%]
+tests/test_preprocess.py::test_numeric_domains PASSED                    [100%]
 
 =============================== warnings summary ===============================
 venv/lib/python3.13/site-packages/fastapi/testclient.py:1
@@ -27,4 +41,4 @@ venv/lib/python3.13/site-packages/fastapi/testclient.py:1
     from starlette.testclient import TestClient as TestClient  # noqa
 
 -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
-======================== 13 passed, 1 warning in 2.56s =========================
+======================== 27 passed, 1 warning in 2.97s =========================

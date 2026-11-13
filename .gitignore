@@ -2,7 +2,12 @@ venv/
 __pycache__/
 *.pyc
 mlruns/
+mlartifacts/
+*.db-journal
+*.db-wal
+*.db-shm
 .pytest_cache/
 logs/
 .commandcode/
 .DS_Store
+mlflow.db

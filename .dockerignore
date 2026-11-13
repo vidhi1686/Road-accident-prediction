@@ -2,10 +2,15 @@ venv/
 __pycache__/
 *.pyc
 mlruns/
+mlartifacts/
 .pytest_cache/
 logs/
 tests/
 data/
+notebooks/
+docs/
+screenshots/
+.github/
 mlflow.db
 README.md
 .git/

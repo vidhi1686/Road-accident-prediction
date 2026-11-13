@@ -55,7 +55,7 @@ def main() -> int:
 
     drifted: list[str] = []
 
-    print(f"{'feature':<18}{'train mean':>12}{'log mean':>12}{'shift (sd)':>12}{'flag':>8}")
+    print(f"{'feature':<26}{'train mean':>12}{'log mean':>12}{'shift (sd)':>12}{'flag':>8}")
     for feature in NUMERIC_FEATURES:
         train_mean = float(train[feature].mean())
         train_std = float(train[feature].std()) or 1.0
@@ -64,9 +64,9 @@ def main() -> int:
         flagged = abs(shift) > args.threshold
         if flagged:
             drifted.append(feature)
-        print(f"{feature:<18}{train_mean:>12.3f}{log_mean:>12.3f}{shift:>12.2f}{'DRIFT' if flagged else 'ok':>8}")
+        print(f"{feature:<26}{train_mean:>12.3f}{log_mean:>12.3f}{shift:>12.2f}{'DRIFT' if flagged else 'ok':>8}")
 
-    print(f"\n{'feature':<18}{'train top':>18}{'log top':>18}{'TVD':>8}{'flag':>8}")
+    print(f"\n{'feature':<26}{'train top':>31}{'log top':>31}{'TVD':>8}{'flag':>8}")
     for feature in CATEGORICAL_FEATURES:
         train_dist = train[feature].value_counts(normalize=True)
         log_dist = log[feature].value_counts(normalize=True)
@@ -76,7 +76,7 @@ def main() -> int:
             drifted.append(feature)
         train_top = train_dist.idxmax()
         log_top = log_dist.idxmax() if not log_dist.empty else "-"
-        print(f"{feature:<18}{train_top:>18}{log_top:>18}{tvd:>8.2f}{'DRIFT' if flagged else 'ok':>8}")
+        print(f"{feature:<26}{train_top:>31}{log_top:>31}{tvd:>8.2f}{'DRIFT' if flagged else 'ok':>8}")
 
     if drifted:
         print(f"\nDrift detected in: {', '.join(drifted)}")
