@@ -1,0 +1,24 @@
+Class mapping: 0 = Non-severe, 1 = Severe
+
+|--- num_vehicles <= -0.50
+|   |--- light_conditions_Daylight <= 0.50
+|   |   |--- num_casualties <= 0.50
+|   |   |   |--- class: 0
+|   |   |--- num_casualties >  0.50
+|   |   |   |--- class: 1
+|   |--- light_conditions_Daylight >  0.50
+|   |   |--- age_band_of_driver <= 0.50
+|   |   |   |--- class: 1
+|   |   |--- age_band_of_driver >  0.50
+|   |   |   |--- class: 0
+|--- num_vehicles >  -0.50
+|   |--- num_casualties <= 1.50
+|   |   |--- types_of_junction_Crossing <= 0.50
+|   |   |   |--- class: 0
+|   |   |--- types_of_junction_Crossing >  0.50
+|   |   |   |--- class: 0
+|   |--- num_casualties >  1.50
+|   |   |--- hour <= 0.56
+|   |   |   |--- class: 0
+|   |   |--- hour >  0.56
+|   |   |   |--- class: 0
