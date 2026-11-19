@@ -43,9 +43,9 @@ jobs:
 
       - name: Start container and check health
         run: |
-          docker run -d --name road-accident-prediction -p 8000:8000 road-accident-prediction
+          docker run -d --name road-accident-prediction -p 10000:10000 road-accident-prediction
           for attempt in $(seq 1 30); do
-            if curl --fail --silent http://127.0.0.1:8000/health; then
+            if curl --fail --silent http://127.0.0.1:10000/health; then
               echo
               echo "Health check passed"
               exit 0

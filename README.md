@@ -2,6 +2,7 @@
 
 **Course:** CSL236 – Introduction to AI and Machine Learning, B.Tech CSE, Semester 5, The NorthCap University
 **Project type:** End-term MLOps system (reproducible preprocessing → tracked experiments → validated API → tests → Docker → CI → deployment configuration)
+**Repository:** [https://github.com/vidhi1686/Road-accident-prediction](https://github.com/vidhi1686/Road-accident-prediction)
 
 | Team member | Roll number | Contributions |
 | --- | --- | --- |
@@ -18,7 +19,7 @@ accident-report information. It is a **binary classification** system:
 - `Non-severe` (0): the report records a slight injury.
 - `Severe` (1): the report records a serious or fatal injury.
 
-The service returns a calibrated-style probability, a human-readable label and
+The service returns a model probability, a human-readable label and
 2–3 rule-based safety tips. It is exposed as a FastAPI service with a browser
 UI, tracked with MLflow, tested with pytest, containerised with Docker and
 prepared for Render deployment.
@@ -66,14 +67,53 @@ from it.
 | 0 — Non-severe | 10,415 | 84.5648% |
 | 1 — Severe | 1,901 | 15.4352% |
 
+**Imbalance ratio:** 10,415 / 1,901 ≈ **5.48 : 1** (Non-severe : Severe). The
+minority class is 15.44% of the data, and the rarest original category
+(`Fatal injury`, 158 rows, 1.28%) is only 1.5% the size of `Slight Injury`.
+
 The dataset is imbalanced. Accuracy alone is therefore not used to judge or
-select a model; macro F1, severe-class recall, severe-class precision and
-ROC-AUC are reported alongside it.
+select a model; balanced accuracy, severe-class recall, severe-class precision,
+severe-class F1, macro F1, ROC-AUC and PR-AUC are reported alongside it.
+
+The imbalance is handled **without changing the raw data**: `data/raw/Road.csv`
+is never modified, no row is deleted, no label is changed, and no synthetic or
+external dataset is used. All balancing experiments operate on the training
+split only.
 
 ## 3. Curated feature contract
 
 The model uses 15 features that are available in an accident report. The
 contract is defined once in `schema.py`.
+
+### Data contract table
+
+This is the complete input contract. Every input row is exactly one entry in
+`schema.FEATURES`, categorical allow-lists are `schema.CATEGORY_VALUES`, numeric
+bounds are the Pydantic constraints in `app.py`, and the target is
+`schema.TARGET`. All 15 inputs are required by `POST /predict`.
+
+| Feature | Data Type | Allowed Range / Values | Why It Matters |
+| --- | --- | --- | --- |
+| `hour` | integer | `0`–`23` (Pydantic `ge=0, le=23`) | Hour of day derived from `Time`; captures time-of-day driving exposure. |
+| `is_weekend` | integer | `0` or `1` (Pydantic `ge=0, le=1`) | Weekend flag derived from `Day_of_week`; separates weekday and weekend travel patterns. |
+| `num_vehicles` | integer | `1`–`50` (Pydantic `ge=1, le=50`); cleaned data observes `1`–`7` | Number of vehicles involved, recorded in the accident report. |
+| `num_casualties` | integer | `0`–`100` (Pydantic `ge=0, le=100`); cleaned data observes `1`–`8` | Reported casualties; post-collision report information, not a pre-accident signal. |
+| `age_band_of_driver` | string (ordinal) | `Under 18`, `18-30`, `31-50`, `Over 51`, `Unknown` | Driver age band recorded in the report. |
+| `driving_experience` | string (ordinal) | `No Licence`, `Below 1yr`, `1-2yr`, `2-5yr`, `5-10yr`, `Above 10yr`, `Unknown` | Driver experience band recorded in the report. |
+| `sex_of_driver` | string (nominal) | `Female`, `Male`, `Unknown` | Driver sex as recorded in the report. |
+| `type_of_vehicle` | string (nominal) | `Automobile`, `Bajaj`, `Bicycle`, `Long lorry`, `Lorry (11?40Q)`, `Lorry (41?100Q)`, `Motorcycle`, `Other`, `Pick up upto 10Q`, `Public (12 seats)`, `Public (13?45 seats)`, `Public (> 45 seats)`, `Ridden horse`, `Special vehicle`, `Stationwagen`, `Taxi`, `Turbo` | Vehicle category involved in the collision. |
+| `area_accident_occurred` | string (nominal) | `Church areas`, `Hospital areas`, `Industrial areas`, `Market areas`, `Office areas`, `Other`, `Outside rural areas`, `Recreational areas`, `Residential areas`, `Rural village areas`, `Rural village areasOffice areas`, `School areas`, `Unknown` | Area type where the accident occurred. |
+| `types_of_junction` | string (nominal) | `Crossing`, `No junction`, `O Shape`, `Other`, `T Shape`, `Unknown`, `X Shape`, `Y Shape` | Junction layout at the accident location. |
+| `road_surface_type` | string (nominal) | `Asphalt roads`, `Asphalt roads with some distress`, `Earth roads`, `Gravel roads`, `Other` | Road surface type at the accident location. |
+| `road_surface_conditions` | string (nominal) | `Dry`, `Flood over 3cm. deep`, `Snow`, `Wet or damp` | Surface condition at the time of the accident. |
+| `light_conditions` | string (nominal) | `Darkness - lights lit`, `Darkness - lights unlit`, `Darkness - no lighting`, `Daylight` | Lighting conditions at the time of the accident. |
+| `weather_conditions` | string (nominal) | `Cloudy`, `Fog or mist`, `Normal`, `Other`, `Raining`, `Raining and Windy`, `Snow`, `Unknown`, `Windy` | Weather at the time of the accident. |
+| `type_of_collision` | string (nominal) | `Collision with animals`, `Collision with pedestrians`, `Collision with roadside objects`, `Collision with roadside-parked vehicles`, `Fall from vehicles`, `Other`, `Rollover`, `Unknown`, `Vehicle with vehicle collision`, `With Train` | Collision category recorded in the report; may only be known after the collision. |
+| `severe` (target, not an API input) | integer (binary) | `0` or `1` | Label derived from `Accident_severity`: `Slight Injury` → `0`; `Serious Injury` or `Fatal injury` → `1`. |
+
+Missing values are imputed inside the training pipeline; the API requires one of
+the listed values for every categorical field. The exact allow-lists are also
+served by `GET /categories`, so the UI cannot drift from this contract.
 
 ### Numeric (4)
 
@@ -186,90 +226,155 @@ share is taken from the 80% train+validation pool).
 - Ordinal: most-frequent imputation → `OrdinalEncoder` with explicit category
   ordering, `handle_unknown="use_encoded_value"`, `unknown_value=-1`.
 - Nominal: most-frequent imputation → `OneHotEncoder(handle_unknown="ignore")`.
-- The complete preprocessing-and-estimator pipeline is fitted on training data
-  only, preventing leakage.
+- Each candidate's complete preprocessing-and-estimator pipeline is fitted on
+  the training rows only, preventing leakage. After selection, that pipeline is
+  refitted on training + validation for the single held-out test evaluation.
 
-Class imbalance handling:
+### Imbalance-handling methods compared
 
-- Logistic Regression: `class_weight="balanced"`.
-- Random Forest: `class_weight="balanced_subsample"`.
-- Gradient Boosting: balanced sample weights passed through the pipeline.
+Every method is applied to the **training rows only** (7,881 rows). Validation
+and test rows are never resampled, and imputers, encoders and scalers are fitted
+after the split and after any training-only resampling.
+
+| Method | Implementation |
+| --- | --- |
+| `none` (baseline) | Unweighted estimator; imbalance handled only by the validation-tuned decision threshold |
+| `balanced` | `class_weight="balanced"` for Random Forest and Logistic Regression; balanced `sample_weight` for Gradient Boosting |
+| `balanced_subsample` | Random Forest only; balanced weights recomputed for every bootstrap sample |
+| `random_oversample` | `RandomOverSampler` on the raw mixed-type training rows |
+| `smotenc` | `SMOTENC` on the raw mixed numeric/categorical training rows, with the 11 categorical columns declared |
+
+Ordinary SMOTE is **not** applied to one-hot or ordinal-encoded features.
+SMOTENC is the only synthetic method used, and it receives the original mixed
+columns before encoding. Resampling never touches `data/raw/Road.csv`,
+`data/accidents.csv`, the validation set or the test set.
 
 The notebook's `VarianceThreshold` + `SelectKBest(f_classif, k=50)` is **not
-retained**. The curated contract produces about 85 one-hot columns rather than
-the notebook's 183, so the dimensionality is already manageable; `SelectKBest`
+retained**. The curated contract produces 73 one-hot columns (79 transformed
+features in total) rather than the notebook's 183, so the dimensionality is
+already manageable; `SelectKBest`
 can discard rare but valid categories and complicates feature-importance
 reporting. Numeric outliers are retained because extreme vehicle/casualty
 counts are plausible accident reports, and `RobustScaler` limits their
 influence.
 
-### Six experiments — validation results
+### Nine candidates — validation results
 
-All candidates use the same split. Selection uses validation data only; the
-test set is not touched.
+The decision threshold is tuned **per candidate on validation predictions
+only** (maximise severe F1, tie-break on recall, precision, then the lower
+threshold). Thresholds that label more than 50% of validation reports as Severe
+are ineligible; the leading candidates label 18–32%, so this guard does not
+bind but prevents a degenerate all-Severe model from winning.
 
-| Run | Algorithm | Hyperparameters | Val macro F1 | Val severe recall | Val precision | Val ROC-AUC | Selected |
-| --- | --- | --- | ---: | ---: | ---: | ---: | :---: |
-| `rf-n100-d6` | Random Forest | `n_estimators=100, max_depth=6` | 0.5996 | **0.3914** | 0.3020 | 0.6596 | **Yes** |
-| `rf-n200-d10` | Random Forest | `n_estimators=200, max_depth=10` | **0.6076** | 0.3125 | 0.3493 | 0.6702 | No |
-| `gb-n100-d3-lr0.1` | Gradient Boosting | `n_estimators=100, max_depth=3, lr=0.1` | 0.5769 | 0.4770 | 0.2617 | **0.6764** | No |
-| `gb-n200-d2-lr0.05` | Gradient Boosting | `n_estimators=200, max_depth=2, lr=0.05` | 0.5703 | **0.4803** | 0.2539 | 0.6613 | No |
-| `logreg-C1.0` | Logistic Regression | `C=1.0` | 0.4947 | 0.5724 | 0.1973 | 0.6037 | No |
-| `logreg-C0.1` | Logistic Regression | `C=0.1` | 0.4910 | 0.5526 | 0.1927 | 0.6014 | No |
+| Run | Algorithm | Balancing | Thr | Severe F1 | Severe recall | Severe precision | Macro F1 | Balanced acc. | PR-AUC | Predicted Severe | Selected |
+| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | :---: |
+| `baseline-rf` | RF 200×d10 | none | 0.17 | **0.3659** | 0.4375 | 0.3144 | **0.6112** | **0.6318** | **0.3307** | 21.5% | **Yes** |
+| `rf-balanced` | RF 200×d10 | balanced | 0.48 | 0.3564 | **0.5428** | 0.2653 | 0.5794 | 0.6343 | 0.3115 | 31.6% | No |
+| `rf-balanced-subsample` | RF 200×d10 | balanced_subsample | 0.47 | 0.3542 | 0.5296 | 0.2661 | 0.5803 | 0.6316 | 0.3014 | 30.7% | No |
+| `rf-random-oversample` | RF 200×d10 | random_oversample | 0.50 | 0.3522 | 0.3882 | **0.3224** | 0.6098 | 0.6197 | 0.3194 | 18.6% | No |
+| `rf-smotenc` | RF 200×d10 | smotenc | 0.18 | 0.2826 | 0.5987 | 0.1850 | 0.4672 | 0.5588 | 0.1745 | 49.9% | No |
+| `baseline-gb` | GB 100×d3 | none | 0.17 | 0.3415 | 0.4375 | 0.2800 | 0.5896 | 0.6162 | 0.2948 | 24.1% | No |
+| `gb-balanced` | GB 100×d3 | balanced | 0.51 | 0.3407 | 0.4572 | 0.2715 | 0.5843 | 0.6167 | 0.2923 | 26.0% | No |
+| `baseline-logreg` | LogReg C=0.1 | none | 0.15 | 0.2862 | 0.5855 | 0.1894 | 0.4785 | 0.5642 | 0.2285 | 47.7% | No |
+| `logreg-balanced` | LogReg C=0.1 | balanced | 0.49 | 0.2939 | 0.6053 | 0.1941 | 0.4827 | 0.5735 | 0.2210 | 48.1% | No |
 
-**Selection rule:** maximise validation macro F1; among candidates within 0.01
-of the best, prefer higher severe-class recall, then precision. `rf-n200-d10`
-had the highest macro F1 (0.6076), but `rf-n100-d6` (0.5996) was within the
-0.01 tolerance and had materially higher severe recall (0.3914 vs 0.3125), so
-it was selected. This is a deliberate recall-oriented trade-off for a
-severity-screening tool.
+At the default 0.5 threshold the unweighted RF labels only 3 of 1,971
+validation reports as Severe (severe recall 0.0099, F1 0.0195), which is why a
+tuned decision threshold is essential. Class weighting and random oversampling
+raise severe recall at 0.5: `rf-balanced` 0.3947 (F1 0.3429),
+`rf-balanced-subsample` 0.3125 (F1 0.3299), `rf-random-oversample` 0.3882
+(F1 0.3522), `gb-balanced` 0.4770 (F1 0.3380) and `logreg-balanced` 0.5526
+(F1 0.2857). Once every candidate gets its own validation-tuned threshold, the
+unweighted RF still has the best severe F1, macro F1, balanced accuracy and
+PR-AUC. `rf-balanced` reaches higher recall (0.5428) but gives up severe F1
+(0.3564), macro F1 (0.5794) and precision (0.2653). SMOTENC is clearly the
+weakest method here: interpolating over nine high-cardinality nominal features
+adds noisy category combinations and its severe F1 falls to 0.2826.
 
-**Decision threshold:** tuned on validation predictions only (severe-class F1,
-tie-broken by recall). The selected threshold is **0.50**.
+**Selection rule:** maximise validation macro F1 at each candidate's tuned
+threshold; among candidates within 0.01 of the best, prefer higher severe-class
+F1, then recall, then precision. Test data is not used for selection, threshold
+tuning or class weighting.
 
-The selected pipeline was then refitted on train + validation and evaluated
-**once** on the held-out test set.
+**Selected model:** `baseline-rf` (Random Forest, 200 trees, `max_depth=10`,
+unweighted), with **decision threshold 0.17**. The selected imbalance handling
+is therefore explicit cost-sensitive threshold tuning, not resampling. This is
+a data-driven choice: no weighting/resampling variant produced a better
+validation severe F1 or macro F1 after threshold tuning. It does not mean the
+class distribution is balanced or that the model is unbiased.
+
+The selected pipeline was then refitted on train + validation (9,852 rows) and
+evaluated **once** on the held-out test set.
 
 ### Final held-out test results
 
 | Metric | Value |
 | --- | ---: |
-| Accuracy | 0.7593 |
-| Severe precision | 0.2940 |
-| Severe recall | 0.4000 |
-| Severe F1 | 0.3389 |
-| Macro F1 | 0.5959 |
-| ROC-AUC | 0.6443 |
+| Decision threshold | 0.17 |
+| Accuracy | 0.7484 |
+| Balanced accuracy | 0.6199 |
+| Severe precision | 0.2895 |
+| Severe recall | 0.4342 |
+| Severe F1 | 0.3474 |
+| Macro F1 | 0.5958 |
+| Weighted F1 | 0.7675 |
+| ROC-AUC | 0.6765 |
+| PR-AUC (average precision) | 0.3349 |
+| Predicted Severe share | 23.13% |
 
 Confusion matrix (rows = actual, columns = predicted):
 
 |  | Predicted Non-severe | Predicted Severe |
 | --- | ---: | ---: |
-| Actual Non-severe | 1,719 | 365 |
-| Actual Severe | 228 | 152 |
+| Actual Non-severe | 1,679 | 405 |
+| Actual Severe | 215 | 165 |
 
-Severe-class report: precision 0.2940, recall 0.4000, F1 0.3389, support 380.
-Macro-average report: precision 0.5885, recall 0.6124, F1 0.5959, support 2,464.
+Severe-class report: precision 0.2895, recall 0.4342, F1 0.3474, support 380.
+Macro-average report: precision 0.5880, recall 0.6199, F1 0.5958, support 2,464.
 
-**Interpretation:** accuracy is 75.9%, but that is dominated by the 84.6%
-non-severe majority. The severe class remains difficult: the model detects 40%
-of severe cases with 29.4% precision. These are honest out-of-sample results;
-no target metric is guaranteed. The model should be treated as a screening aid,
-not an automated triage decision.
+### Comparison with the previous model
+
+The previous artifact was a balanced-subsample Random Forest (100 trees,
+`max_depth=6`) at threshold 0.50.
+
+| Test metric | Previous | New | Change |
+| --- | ---: | ---: | ---: |
+| Accuracy | 0.7593 | 0.7484 | −0.0109 |
+| Balanced accuracy | 0.6124 | 0.6199 | +0.0075 |
+| Severe precision | 0.2940 | 0.2895 | −0.0045 |
+| Severe recall | 0.4000 | 0.4342 | **+0.0342** |
+| Severe F1 | 0.3389 | 0.3474 | **+0.0085** |
+| Macro F1 | 0.5959 | 0.5958 | −0.0001 |
+| ROC-AUC | 0.6443 | 0.6765 | **+0.0322** |
+| PR-AUC | not recorded | 0.3349 | — |
+
+The new model detects 13 more severe cases (165 vs 152) at the cost of 40 more
+false positives and a 1.1-point accuracy drop. That is the intended trade-off
+for a severity-screening aid, and it is small rather than transformative: the
+severe class is still difficult.
+
+**Interpretation:** accuracy is 74.8%, but that is dominated by the 84.6%
+non-severe majority. The model detects 43.4% of severe cases with 28.9%
+precision. These are honest out-of-sample results on one split; no target metric
+is guaranteed. The model should be treated as a screening aid, not an automated
+triage decision, and it is not unbiased.
 
 ## 6. MLflow experiment tracking
 
-All six candidates are logged to the new experiment
-**`road-accident-severity-real`** in the SQLite store `mlflow.db`. The old
-synthetic-data experiment is not reused, so real and synthetic runs are never
-mixed.
+Each `python train.py --all` execution logs **nine candidates** to the
+**`road-accident-severity-real`** experiment in the SQLite store `mlflow.db`.
+The old synthetic-data experiment is not reused, so real and synthetic runs are
+never mixed.
 
 Each candidate run logs:
 
-- Algorithm and hyperparameters.
+- Algorithm, hyperparameters and the balancing method.
 - Dataset name, row count, SHA-256 content hash and severe prevalence.
 - Train/validation/test sizes, random state and split fractions.
-- Validation accuracy, precision, recall, F1, macro F1 and ROC-AUC.
+- Validation metrics at 0.5 and at the validation-tuned threshold: accuracy,
+  balanced accuracy, precision, recall, F1, macro F1, weighted F1, ROC-AUC,
+  PR-AUC and predicted Severe share.
+- For resampling runs, training-row counts before/after resampling.
 - The candidate pipeline artifact under `model/`.
 
 The selected run additionally logs the decision threshold, tuned validation
@@ -282,8 +387,10 @@ mlflow ui --backend-store-uri sqlite:///mlflow.db --port 5001
 
 `mlruns/` and `mlartifacts/` are gitignored.
 
-Fresh evidence: [MLflow runs](docs/screenshots/mlflow_runs.png) and the
-[selected run detail](docs/screenshots/mlflow_run_detail.png).
+Earlier reference screenshots: [MLflow runs](docs/screenshots/mlflow_runs.png)
+and [run detail](docs/screenshots/mlflow_run_detail.png). These were captured
+before the current nine-candidate run and are retained for context; they are not
+evidence for the current model.
 
 ## 7. API
 
@@ -335,7 +442,7 @@ curl -X POST http://127.0.0.1:8000/predict \
 {
   "prediction": 1,
   "label": "Severe",
-  "severity_probability": 0.7982,
+  "severity_probability": 0.8368,
   "tips": [
     "Low visibility: use headlights and watch for pedestrians and cyclists.",
     "Multiple casualties reported: prioritise emergency response and secure the scene.",
@@ -361,8 +468,9 @@ real API predictions is committed at `docs/sample_predictions.jsonl`.
   importances.
 - Clear display of FastAPI validation errors.
 
-Fresh evidence: [prediction UI](docs/screenshots/ui_prediction.png) and
-[API docs](docs/screenshots/api_docs.png).
+Reference screenshots: [prediction UI (previous design)](docs/screenshots/ui_prediction.png)
+and [API docs](docs/screenshots/api_docs.png). The UI screenshot predates the
+current dashboard redesign and does not show the current interface.
 
 ## 9. Automated tests
 
@@ -370,7 +478,7 @@ Fresh evidence: [prediction UI](docs/screenshots/ui_prediction.png) and
 pytest -v --tb=short
 ```
 
-**27 tests pass.**
+**31 tests pass.**
 
 `tests/test_app.py` covers:
 
@@ -396,6 +504,15 @@ pytest -v --tb=short
 - Missing-value handling and unknown/whitespace normalisation.
 - Numeric domains.
 
+`tests/test_train.py` covers:
+
+- The stratified train/validation/test split is disjoint and preserves prevalence.
+- Random oversampling touches only the supplied training rows and balances them
+  without mutating the input.
+- Threshold tuning respects the predicted-Severe-rate cap.
+- Model selection uses validation metrics only and rejects a degenerate
+  all-Severe candidate.
+
 Captured output: `docs/pytest_output.txt`.
 
 ## 10. GitHub Actions CI
@@ -408,7 +525,7 @@ trained model from the same workspace:
 3. Run `python data/preprocess.py`.
 4. Validate the processed dataset shape, columns and binary target.
 5. Reset the CI MLflow store.
-6. Train all six experiments and promote the selected model
+6. Train all nine imbalance-handling candidates and promote the selected model
    (`python train.py --all --promote always`).
 7. Run `pytest -v --tb=short`.
 8. Build the Docker image.
@@ -424,22 +541,40 @@ The serving image contains only `app.py`, `schema.py`, `model/`, `static/` and
 `requirements-serve.txt`. It does **not** include the raw or processed dataset.
 
 ```bash
-docker build -t road-accident-prediction .
-docker run -d -p 8000:8000 --restart unless-stopped road-accident-prediction
+docker build -t road-accident-prediction:local .
+docker run -d --name road-accident-prediction --restart unless-stopped -p 10000:10000 road-accident-prediction:local
 ```
 
-Verified locally:
+The `--restart unless-stopped` policy automatically restarts the container if it
+stops unexpectedly (for example, after a crash or host reboot), unless it was
+explicitly stopped.
 
-- Image size: **152.7 MB**.
+Verified with a local build of the current model (Docker Desktop, arm64):
+
+- Image size: **approximately 771 MB** for the verified local build.
+- Container started on port **10000**; Docker health status reached `healthy`.
 - `/health` returned `{"status":"ok","model_loaded":true}`.
-- `/predict` returned a valid binary response.
+- `/model-info` returned `algorithm: rf`, `decision_threshold: 0.17` and the
+  current test metrics.
+- `/predict` returned a valid response for the test payload
+  (`prediction: 0`, `label: "Non-severe"`, `severity_probability: 0.1326`,
+  plus safety tips).
+- `/` and `/categories` returned HTTP 200.
 - The container was stopped and removed after verification.
 
-The server honours Render's `PORT` environment variable with `8000` as the
+The serving dependency set was also checked inside the container: the promoted
+pipeline contains only scikit-learn steps (no imbalanced-learn), so
+`requirements-serve.txt` is unchanged and `imblearn` is **not** needed at
+serving time. CI builds and health-checks the image on every push.
+
+This was a local container verification only; the application is not deployed
+live.
+
+The server honours Render's `PORT` environment variable with `10000` as the
 local fallback:
 
 ```dockerfile
-CMD ["sh", "-c", "uvicorn app:app --host 0.0.0.0 --port ${PORT:-8000}"]
+CMD ["sh", "-c", "uvicorn app:app --host 0.0.0.0 --port ${PORT:-10000}"]
 ```
 
 ## 12. Render deployment configuration
@@ -503,7 +638,8 @@ Road-accident-prediction/
 │   └── index.html               # browser UI
 ├── tests/
 │   ├── test_app.py              # API contract, validation, logging
-│   └── test_preprocess.py       # preprocessing and schema compatibility
+│   ├── test_preprocess.py       # preprocessing and schema compatibility
+│   └── test_train.py            # split, training-only resampling, threshold selection
 ├── docs/
 │   ├── pytest_output.txt
 │   ├── sample_predictions.jsonl
@@ -511,14 +647,14 @@ Road-accident-prediction/
 ├── .github/workflows/ci.yml
 ├── app.py                       # FastAPI service
 ├── schema.py                    # single source of truth for features/categories
-├── train.py                     # six experiments + validation-based selection
+├── train.py                     # 9 imbalance candidates + validation-based selection
 ├── drift_check.py               # input-drift monitor
 ├── Dockerfile
 ├── requirements.txt
 ├── requirements-serve.txt
 ├── pytest.ini
 ├── render.yaml
-├── mlflow.db                    # six real-data MLflow runs
+├── mlflow.db                    # local MLflow SQLite store (gitignored, not tracked)
 └── README.md
 ```
 
@@ -535,7 +671,7 @@ pip install -r requirements.txt
 # 1. Build the cleaned dataset
 python data/preprocess.py
 
-# 2. Train all six candidates, select on validation, evaluate test once
+# 2. Train all nine candidates, select on validation, evaluate test once
 python train.py --all --promote always
 
 # 3. Explore experiments
@@ -551,21 +687,23 @@ uvicorn app:app --reload --port 8000
 # API docs: http://127.0.0.1:8000/docs
 ```
 
-Run an individual experiment if needed:
+Run an individual experiment if needed (`--balancing` defaults to `balanced`):
 
 ```bash
-python train.py --algorithm rf --n_estimators 100 --max_depth 6
-python train.py --algorithm rf --n_estimators 200 --max_depth 10
+python train.py --algorithm rf --n_estimators 200 --max_depth 10 --balancing none
+python train.py --algorithm rf --n_estimators 200 --max_depth 10 --balancing balanced
+python train.py --algorithm rf --n_estimators 200 --max_depth 10 --balancing balanced_subsample
+python train.py --algorithm rf --n_estimators 200 --max_depth 10 --balancing random_oversample
+python train.py --algorithm rf --n_estimators 200 --max_depth 10 --balancing smotenc
 python train.py --algorithm gb --n_estimators 100 --max_depth 3 --learning_rate 0.1
-python train.py --algorithm gb --n_estimators 200 --max_depth 2 --learning_rate 0.05
-python train.py --algorithm logreg --C 1.0
-python train.py --algorithm logreg --C 0.1
+python train.py --algorithm logreg --C 0.1 --balancing balanced
 ```
 
 Promotion controls:
 
-- `--promote auto` (default): promote only if validation macro F1 beats the
-  existing real-data metrics. Old synthetic metrics are ignored.
+- `--promote auto` (default): promote when tuned validation macro F1 improves,
+  or when it is within 0.01 of the existing model and severe F1 is higher. Old
+  synthetic metrics are ignored.
 - `--promote always`: overwrite `model/model.joblib` and `model/metrics.json`.
 - `--promote never`: generate and log a candidate without promoting it.
 
@@ -582,24 +720,32 @@ Deliberate differences in the production rebuild:
 | Notebook | Production rebuild |
 | --- | --- |
 | Three classes (Slight / Serious / Fatal) | Binary `severe` (Serious + Fatal = 1) |
-| 31 raw features, including casualty-outcome columns | 15 curated report-time features, leakage excluded |
-| 183 encoded features, `SelectKBest(k=50)` | ~85 encoded features, no selector |
+| 31 raw features, including casualty-outcome columns | 15 curated features, some recorded after the collision; leakage columns excluded |
+| 183 encoded features, `SelectKBest(k=50)` | 79 encoded features, no selector |
 | 80/20 train/test | 64/16/20 train/validation/test |
 | Test-set model inspection | Validation-only selection; one final test evaluation |
 | Logistic Regression only | RF / GB / LogReg candidates |
+| `class_weight='balanced'` only | Baseline, class weights, balanced subsampling, random oversampling and SMOTENC compared on validation |
 | No tracking, persistence or serving | MLflow, Joblib, FastAPI, tests, Docker, CI |
 
 ## 17. Limitations
 
 - The model is trained on Indian city-police accident records and may not
   generalise to other countries, reporting systems or time periods.
-- The severe class is imbalanced (15.4%); severe recall is 40% and severe
-  precision is 29.4% on the held-out test set. Accuracy alone is misleading.
+- The severe class is imbalanced (15.4%); severe recall is 43.4% and severe
+  precision is 28.9% on the held-out test set (severe F1 0.3474, PR-AUC 0.3349).
+  Accuracy alone is misleading, and the model is **not** unbiased.
+- Class weighting and random oversampling raised recall at the default 0.5
+  threshold but did not improve severe F1 or macro F1 after validation
+  threshold tuning. SMOTENC degraded validation performance, so it was not
+  selected. These results come from one stratified split; a different split
+  could reorder close candidates.
 - Some selected inputs are report-time or post-collision information
   (`num_casualties`, `type_of_collision`). This is severity classification, not
   pre-accident prediction.
-- No temporal validation, probability calibration or cost-sensitive threshold
-  analysis has been performed beyond the validation-tuned threshold.
+- No temporal validation or probability calibration has been performed. The
+  decision threshold is tuned on a single validation split and may not transfer
+  to a different population or reporting process.
 - Render's filesystem is ephemeral, so prediction logs may not survive restarts.
 - The Kaggle dataset page should be consulted for licensing terms; this
   repository does not grant a separate dataset license.
