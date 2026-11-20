@@ -6,8 +6,8 @@
 
 | Team member | Roll number | Contributions |
 | --- | --- | --- |
-| Vidhi Jindal | 24csu324 | _to be confirmed by the team_ |
-| Palak Khanna | 24csu325 | _to be confirmed by the team_ |
+| Vidhi Jindal | 24csu324 |
+| Palak Khanna | 24csu325 | 
 
 ---
 
