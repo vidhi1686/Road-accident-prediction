@@ -4,7 +4,7 @@
 **Project type:** End-term MLOps system (reproducible preprocessing → tracked experiments → validated API → tests → Docker → CI → deployment configuration)
 **Repository:** [https://github.com/vidhi1686/Road-accident-prediction](https://github.com/vidhi1686/Road-accident-prediction)
 
-| Team member | Roll number | Contributions |
+| Team member | Roll number |
 | --- | --- | --- |
 | Vidhi Jindal | 24csu324 |
 | Palak Khanna | 24csu325 | 
